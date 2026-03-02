@@ -7,6 +7,8 @@ export const styles = css`
     --tidal-curve-fill-end: rgba(79, 195, 247, 0.30);
     --tidal-night-fill: rgba(0, 0, 40, 0.40);
     --tidal-glow-color: rgba(79, 195, 247, 0.35);
+    display: flex;
+    flex-direction: column;
   }
 
   :host(.light-mode) {
@@ -77,6 +79,10 @@ export const styles = css`
     font-weight: 400;
     color: var(--secondary-text-color);
     margin-top: 4px;
+  }
+
+  .hero-direction .arrow {
+    font-size: 12px;
   }
 
   .hero-right {

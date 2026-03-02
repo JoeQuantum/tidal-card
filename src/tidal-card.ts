@@ -110,17 +110,9 @@ class TidalCard extends LitElement {
   }
 
   getCardSize(): number {
-    return 3;
+    return 5;
   }
 
-  getGridOptions() {
-    return {
-      columns: 12,
-      rows: 4,
-      min_columns: 6,
-      min_rows: 3,
-    };
-  }
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -304,7 +296,7 @@ class TidalCard extends LitElement {
 
     const isRising = this._nextEvent?.type === 'H';
     const directionLabel = this._nextEvent ? (isRising ? 'Rising' : 'Falling') : '';
-    const directionArrow = this._nextEvent ? (isRising ? '\u2191' : '\u2193') : '';
+    const directionArrow = this._nextEvent ? (isRising ? '\u25B2' : '\u25BC') : '';
     const nextEventType = this._nextEvent ? (this._nextEvent.type === 'H' ? 'High' : 'Low') : '';
     const countdown = this._nextEvent
       ? formatCountdown(this._now.getTime(), new Date(this._nextEvent.t).getTime())
@@ -369,7 +361,7 @@ customElements.define('tidal-card', TidalCard);
   name: 'Tidal Card',
   description: 'Tide visualization card with SVG curve and predictions',
   preview: true,
-  documentationURL: 'https://github.com/JoeQuantum/lovelace-tidal-card',
+  documentationURL: 'https://github.com/JoeQuantum/tidal-card',
 });
 
 console.info(
