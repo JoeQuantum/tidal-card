@@ -2,7 +2,8 @@
 
 A custom Home Assistant Lovelace card that visualizes tide predictions as a smooth SVG curve. Shows current tide height, rising/falling status, countdown to next high or low, day/night shading, moon phase icons, and peak labels -- all rendered inline with no external chart libraries. Designed for a clean, minimal aesthetic inspired by iOS weather widgets.
 
-![Screenshot](screenshots/tidal-card-dark.png)
+![Dark mode](screenshots/tidal-card-dark.png)
+![Light mode](screenshots/tidal-card-light.png)
 
 ## Features
 
