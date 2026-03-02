@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 
 # Claude Code working directory
 .claude/
+
+CLAUDE.md
