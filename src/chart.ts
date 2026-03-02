@@ -1,5 +1,6 @@
 import { html, svg, nothing, TemplateResult } from 'lit';
 import { TidePoint, ChartRange, HiLoPrediction, MoonPhaseInfo } from './types';
+import { getCurrentTideHeight, formatShortTime } from './utils';
 
 const WIDTH = 500;
 const CHART_HEIGHT = 195;
@@ -13,6 +14,11 @@ const LABEL_BOTTOM = TIME_AXIS_Y - 10; // max Y for peak labels below curve
 export interface NightInterval {
   start: number;
   end: number;
+}
+
+function computeGridStep(range: ChartRange): number {
+  const dataRange = range.max - range.min;
+  return dataRange < 6 ? 1 : dataRange < 15 ? 2 : 5;
 }
 
 export function renderTideCurve(
@@ -44,20 +50,12 @@ export function renderTideCurve(
   const nowMs = now.getTime();
   const nowInRange = nowMs >= chartStartTime && nowMs <= chartEndTime;
   const nowX = nowInRange ? timeToX(nowMs) : 0;
-  const nowHeight = nowInRange ? interpolateHeight(series, now) : 0;
+  const nowHeight = nowInRange ? (getCurrentTideHeight(series, now) ?? series[0].height) : 0;
   const nowY = nowInRange ? heightToY(nowHeight) : 0;
 
   // Data boundary: X position of last data point — clip decorations beyond this
   const lastDataMs = series[series.length - 1].time.getTime();
   const dataEndX = Math.min(WIDTH, timeToX(lastDataMs));
-
-  console.debug('[tidal-card] data boundary:', {
-    lastDataMs,
-    lastDataISO: new Date(lastDataMs).toISOString(),
-    dataEndX,
-    chartEndTime,
-    chartEndISO: new Date(chartEndTime).toISOString(),
-  });
 
   // Compute average curve Y for gradient origin
   const avgCurveY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
@@ -67,6 +65,8 @@ export function renderTideCurve(
 
   // Compute peak labels first so grid labels can avoid them (future only)
   const peakLabelRects = computeVisiblePeakLabels(hilos, chartStartTime, chartEndTime, nowMs, timeToX, heightToY);
+
+  const gridStep = computeGridStep(range);
 
   return html`
     <svg viewBox="0 0 ${WIDTH} ${CHART_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
@@ -86,7 +86,7 @@ export function renderTideCurve(
       <g clip-path="url(#data-clip)">
         ${renderDayLines(chartStartTime, chartEndTime, timeToX)}
         ${renderNightShading(nightIntervals, timeToX)}
-        ${renderGridLines(range, heightToY)}
+        ${renderGridLines(range, heightToY, gridStep)}
         ${renderDayLabelsFromPositions(dayLabelPositions)}
 
         <path d="${areaD}" fill="url(#tidal-fill)" />
@@ -95,7 +95,7 @@ export function renderTideCurve(
           stroke="var(--tidal-curve-stroke, #4FC3F7)" stroke-width="4"
           filter="url(#glow)" />
 
-        ${renderGridLabels(range, heightToY, peakLabelRects.map((l) => l.rect))}
+        ${renderGridLabels(range, heightToY, peakLabelRects.map((l) => l.rect), gridStep)}
 
         ${peakLabelRects.map((lbl) => {
           const timeStr = formatShortTime(new Date(lbl.item.hl.t));
@@ -110,7 +110,7 @@ export function renderTideCurve(
         })}
 
         ${nowInRange
-          ? renderNowDot(nowX, nowY, nowHeight, now, hilos, chartStartTime, chartEndTime, timeToX, heightToY)
+          ? renderNowDot(nowX, nowY)
           : nothing}
 
         ${renderTimeAxis(chartStartTime, chartEndTime, timeToX)}
@@ -286,8 +286,7 @@ function renderTimeAxis(
     const hr = d.getHours();
     const ampm = hr >= 12 ? 'PM' : 'AM';
     const h12 = hr % 12 || 12;
-    // At widest zoom levels (24h step), only noon/midnight matter
-    const label = stepH >= 24 ? `${h12} ${ampm}` : `${h12} ${ampm}`;
+    const label = `${h12} ${ampm}`;
     result.push(svg`
       <text x="${x}" y="${TIME_AXIS_Y}" text-anchor="middle"
         font-size="13" font-weight="400"
@@ -300,8 +299,8 @@ function renderTimeAxis(
 function renderGridLines(
   range: ChartRange,
   heightToY: (h: number) => number,
+  step: number,
 ) {
-  const step = 2;
   const first = Math.floor(range.min / step) * step;
   const last = Math.ceil(range.max / step) * step;
   const result = [];
@@ -322,8 +321,8 @@ function renderGridLabels(
   range: ChartRange,
   heightToY: (h: number) => number,
   peakRects: LabelRect[],
+  step: number,
 ) {
-  const step = 2;
   const first = Math.floor(range.min / step) * step;
   const last = Math.ceil(range.max / step) * step;
   const result = [];
@@ -472,7 +471,10 @@ function renderMoonPhaseIcons(
 
   const MOON_Y = 8; // above day labels (which are at PLOT_TOP - 6 = 22)
   return moonPhases.map((mp) => {
-    const t = mp.date.getTime();
+    // Position at noon of the phase day for better separation from day labels
+    const phaseNoon = new Date(mp.date);
+    phaseNoon.setHours(12, 0, 0, 0);
+    const t = phaseNoon.getTime();
     if (t < chartStartTime || t > chartEndTime) return nothing;
     const x = timeToX(t);
     // Hide if clipped at right edge or too close to a day label
@@ -511,51 +513,11 @@ function moonSvgIcon(phase: MoonPhaseInfo['phase'], r: number) {
   }
 }
 
-function renderNowDot(
-  nowX: number,
-  nowY: number,
-  nowHeight: number,
-  now: Date,
-  hilos: HiLoPrediction[],
-  chartStartTime: number,
-  chartEndTime: number,
-  timeToX: (t: number) => number,
-  _heightToY: (h: number) => number,
-) {
-  // Check if now-dot is within 10% of chart width of any peak label X
-  const proximityThreshold = WIDTH * 0.10;
-  const peakXPositions: number[] = [];
-  for (const hl of hilos) {
-    const t = new Date(hl.t).getTime();
-    if (t < chartStartTime || t > chartEndTime) continue;
-    peakXPositions.push(timeToX(t));
-  }
-  const tooClose = peakXPositions.some((px) => Math.abs(nowX - px) < proximityThreshold);
-
-  const labelText = `${nowHeight.toFixed(1)} ft ${formatShortTime(now)}`;
-
+function renderNowDot(nowX: number, nowY: number) {
   return svg`
     <circle class="now-dot" cx="${nowX}" cy="${nowY}" r="6"
       fill="#ffffff" />
-    ${tooClose
-      ? nothing
-      : svg`<text x="${nowX + 10}" y="${nowY - 8}" text-anchor="start"
-          font-size="10" font-weight="400"
-          fill="var(--secondary-text-color, #aaa)">${labelText}</text>`}
   `;
-}
-
-function interpolateHeight(series: TidePoint[], now: Date): number {
-  const t = now.getTime();
-  for (let i = 0; i < series.length - 1; i++) {
-    const t0 = series[i].time.getTime();
-    const t1 = series[i + 1].time.getTime();
-    if (t >= t0 && t <= t1) {
-      const frac = (t - t0) / (t1 - t0);
-      return series[i].height + frac * (series[i + 1].height - series[i].height);
-    }
-  }
-  return series[0].height;
 }
 
 function monotoneCubicPath(points: { x: number; y: number }[]): string {
@@ -596,12 +558,4 @@ function monotoneCubicPath(points: { x: number; y: number }[]): string {
   }
 
   return d;
-}
-
-function formatShortTime(date: Date): string {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hr = h % 12 || 12;
-  return m === 0 ? `${hr} ${ampm}` : `${hr}:${m.toString().padStart(2, '0')} ${ampm}`;
 }

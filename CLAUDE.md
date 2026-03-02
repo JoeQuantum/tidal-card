@@ -79,7 +79,7 @@ Example: sensor.tide_predictions_series
 - Day labels: 11px, weight 600, 0.6 opacity
 
 ### Chart time range
-- Default chart_hours: 48 (config slider 24-168, step 24)
+- Default chart_hours: 48 (config slider 24-96, step 24, clamped to 96 max)
 - Lookback: min(12h, chart_hours * 0.15) of history shown before "now"
 - Chart end clamped to last available data point
 - All chart content clipped to data boundary via SVG clipPath
@@ -99,7 +99,7 @@ Example: sensor.tide_predictions_series
 - LOW peaks: height above trough (24px clearance), time below trough (8px clearance)
 - Future peaks only (past peaks unlabeled)
 - Collision detection: bounding box overlap check, skip colliding labels
-- Wide zoom (>168h): decimation keeps best H/L per day bucket
+- Wide zoom (>96h): decimation keeps best H/L per day bucket
 - Left margin: labels start at x=50 minimum
 - Labels clamped to valid plot zone (PLOT_TOP to LABEL_BOTTOM)
 

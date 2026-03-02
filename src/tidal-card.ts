@@ -12,7 +12,7 @@ interface HomeAssistant {
   themes: { darkMode: boolean; [key: string]: unknown };
 }
 
-const CARD_VERSION = '0.1.0';
+const CARD_VERSION = '1.0.0';
 
 class TidalCard extends LitElement {
   static styles = styles;
@@ -52,11 +52,11 @@ class TidalCard extends LitElement {
     }
     this._config = {
       type: 'custom:tidal-card',
-      chart_hours: 48,
       show_moon_phases: true,
       entity_sun: 'sun.sun',
       show_day_night: true,
       ...config,
+      chart_hours: Math.min(config.chart_hours ?? 48, 96),
     } as TidalCardConfig;
   }
 
@@ -80,7 +80,7 @@ class TidalCard extends LitElement {
         {
           name: 'chart_hours',
           default: 48,
-          selector: { number: { min: 24, max: 168, step: 24, mode: 'slider' } },
+          selector: { number: { min: 24, max: 96, step: 24, mode: 'slider' } },
         },
         {
           name: 'show_moon_phases',
@@ -279,13 +279,6 @@ class TidalCard extends LitElement {
       }
     }
 
-    console.debug('[tidal-card] render range:', {
-      chartHours,
-      effectiveHours: (chartEndMs - chartStartMs) / 3600000,
-      chartStart: new Date(chartStartMs).toISOString(),
-      chartEnd: new Date(chartEndMs).toISOString(),
-    });
-
     const chartStart = new Date(chartStartMs);
     const chartEnd = new Date(chartEndMs);
     const moonPhases = this._config.show_moon_phases
@@ -373,7 +366,7 @@ customElements.define('tidal-card', TidalCard);
   name: 'Tidal Card',
   description: 'Tide visualization card with SVG curve and predictions',
   preview: true,
-  documentationURL: 'https://github.com/benpoole/lovelace-tidal-card',
+  documentationURL: 'https://github.com/JoeQuantum/lovelace-tidal-card',
 });
 
 console.info(

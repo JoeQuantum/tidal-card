@@ -4,7 +4,7 @@ import { MoonPhaseInfo } from './types';
 const REFERENCE_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14, 0);
 const SYNODIC_PERIOD = 29.53059; // days
 
-export function getMoonPhase(date: Date): number {
+function getMoonPhase(date: Date): number {
   const daysSinceRef = (date.getTime() - REFERENCE_NEW_MOON) / (1000 * 60 * 60 * 24);
   const cycles = daysSinceRef / SYNODIC_PERIOD;
   return cycles - Math.floor(cycles); // 0..1 phase fraction

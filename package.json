@@ -1,6 +1,6 @@
 {
   "name": "lovelace-tidal-card",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Custom Home Assistant Lovelace card for tide visualization",
   "type": "module",
   "main": "dist/tidal-card.js",
