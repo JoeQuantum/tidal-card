@@ -1,0 +1,37 @@
+{
+  "name": "lovelace-tidal-card",
+  "version": "0.1.0",
+  "description": "Custom Home Assistant Lovelace card for tide visualization",
+  "type": "module",
+  "main": "dist/tidal-card.js",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c --watch --environment SERVE",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "home-assistant",
+    "lovelace",
+    "custom-card",
+    "tide",
+    "hacs"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "custom-card-helpers": "^1.9.0",
+    "home-assistant-js-websocket": "^9.4.0",
+    "lit": "^3.2.0",
+    "tslib": "^2.7.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "@types/node": "^22.0.0",
+    "rollup": "^4.28.0",
+    "rollup-plugin-serve": "^3.0.0",
+    "typescript": "^5.7.0"
+  }
+}
