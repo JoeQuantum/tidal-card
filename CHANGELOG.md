@@ -3,6 +3,19 @@
 All notable changes to Tidal Card will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [1.0.2] - 2026-05-29
+
+### Added
+
+- README and `screenshots/` now include dark- and light-mode screenshots of the card.
+- `CHANGELOG.md` with retroactive entries for v1.0.0 and v1.0.1.
+
+### Changed
+
+- CI: tag-triggered release workflow now auto-populates the GitHub release body from the matching `CHANGELOG.md` section, and hard-fails if the tag has no corresponding entry.
+
+No runtime changes to the card itself.
+
 ## [1.0.1] - 2026-03-02
 
 ### Changed
