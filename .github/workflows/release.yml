@@ -17,6 +17,17 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build
+      - name: Extract changelog section
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk "/^## \[$VERSION\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "::error::No CHANGELOG.md section found for version $VERSION"
+            exit 1
+          fi
+          echo "--- release notes ---"
+          cat release_notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/tidal-card.js
+          body_path: release_notes.md
