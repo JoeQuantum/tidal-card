@@ -69,15 +69,45 @@ show_moon_phases: true
 show_day_night: true
 ```
 
-## Compatible integrations
+## Data sources
 
-This card works with any sensor that provides tide predictions in the `{t, v, type}` attribute format.
+The card needs two sensors: one with the high/low tide peaks (`entity_hilo`) and one with a 30-minute interval series (`entity_series`). Both must expose a `predictions` attribute matching the formats below.
 
-**Recommended for US users:**
+### United States: NOAA REST sensors
 
-- [**HA_Noaa_Tides**](https://github.com/Flight-Lab/HA_Noaa_Tides) -- NOAA CO-OPS tide predictions for US stations (free, no API key)
+NOAA's CO-OPS API serves tide predictions for free with no API key, in the exact format the card expects. The simplest path is two REST sensors in `configuration.yaml` that hit the same endpoint with different `interval` values.
 
-**International integrations** (entity mode -- point your entity IDs at the card):
+Find your station ID at the [NOAA Tides and Currents map](https://tidesandcurrents.noaa.gov/map/index.html?type=tidepredictions). The example below uses station `9447130` (Seattle) -- replace with your own.
+
+```yaml
+# configuration.yaml
+sensor:
+  - platform: rest
+    name: Tide Predictions Series
+    resource: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&date=today&range=96&interval=30&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
+    method: GET
+    scan_interval: 3600
+    value_template: "OK"
+    json_attributes:
+      - predictions
+
+  - platform: rest
+    name: Tide Predictions Hilo
+    resource: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&date=today&range=96&interval=hilo&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
+    method: GET
+    scan_interval: 3600
+    value_template: "OK"
+    json_attributes:
+      - predictions
+```
+
+Restart Home Assistant. You'll get `sensor.tide_predictions_series` and `sensor.tide_predictions_hilo` -- point the card at those.
+
+> The [HA_Noaa_Tides](https://github.com/Flight-Lab/HA_Noaa_Tides) integration provides a `Tide Predictions` sensor that exposes the current tide *state* (rising/falling, factor, percentage) -- but **not** the 30-minute interval series the card needs for the smooth curve. The REST sensors above are the current path for US users. Direct NOAA fetch from inside the card itself (no HA sensors required) is on the v1.3 roadmap.
+
+### International integrations (entity mode)
+
+The following integrations expose tide data in formats that can drive the card; some may need a template sensor to reshape the attributes:
 
 - [**worldtidesinfocustom**](https://github.com/jugla/worldtidesinfocustom) -- Global coverage, 8,000+ stations (paid, ~$10/18 years)
 - [**HASS-ukho_tides**](https://github.com/ianByrne/HASS-ukho_tides) -- UK, 607 stations (free with API key)
@@ -86,7 +116,17 @@ This card works with any sensor that provides tide predictions in the `{t, v, ty
 - [**moderntides**](https://github.com/ALArvi019/moderntides) -- Spain via IHM (free, no key)
 - [**ha-bsh_tides**](https://github.com/EnlightningMan/ha-bsh_tides) -- German North Sea coast
 
-International integrations may require template sensors to match the expected attribute format. Compatibility documentation for each integration is planned for v1.3.
+Per-integration compatibility documentation is planned for v1.3.
+
+### Required attribute format
+
+The card reads a `predictions` attribute from each sensor.
+
+For `entity_hilo`, each prediction is `{t, v, type}` where `t` is a local time string `YYYY-MM-DD HH:MM`, `v` is height in feet (string), and `type` is `"H"` or `"L"`.
+
+For `entity_series`, each prediction is `{t, v}` -- same `t` and `v` semantics, no `type`. Intervals should be 30 minutes.
+
+NOAA's API output matches both formats directly. Other integrations may need a template sensor to reshape.
 
 ## Roadmap
 
