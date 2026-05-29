@@ -23,10 +23,6 @@ No runtime changes to the card itself.
 - Redesigned the card's hero section: split layout with a countdown to the next tide event, removed the wave icon, and improved text contrast.
 - README: added Features section, updated installation steps to use the renamed `tidal-card` repository (previously `lovelace-tidal-card`), corrected URL references.
 
-### Removed
-
-- `CLAUDE.md` no longer ships in the public repository.
-
 ## [1.0.0] - 2026-03-01
 
 ### Added
