@@ -9,6 +9,8 @@ export const styles = css`
     --tidal-glow-color: rgba(79, 195, 247, 0.35);
     display: flex;
     flex-direction: column;
+    height: 100%;
+    align-self: stretch;
   }
 
   :host(.light-mode) {
@@ -21,6 +23,9 @@ export const styles = css`
 
   ha-card {
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
   }
 
   .hero {
@@ -111,10 +116,13 @@ export const styles = css`
   .chart-container {
     width: 100%;
     margin-top: 4px;
+    flex: 1;
+    min-height: 0;
   }
 
   .chart-container svg {
     width: 100%;
+    height: 100%;
     display: block;
     overflow: visible;
   }

@@ -2,14 +2,42 @@ import { html, svg, nothing, TemplateResult } from 'lit';
 import { TidePoint, ChartRange, HiLoPrediction, MoonPhaseInfo } from './types';
 import { getCurrentTideHeight, formatShortTime } from './utils';
 
-const WIDTH = 500;
-const CHART_HEIGHT = 195;
-const PLOT_TOP = 28;
-const PLOT_BOTTOM = 162;
-const PLOT_HEIGHT = PLOT_BOTTOM - PLOT_TOP;
-const DAY_LABEL_Y = 14;
-const TIME_AXIS_Y = 185;
-const LABEL_BOTTOM = TIME_AXIS_Y - 10; // max Y for peak labels below curve
+export interface ChartDims {
+  width: number;
+  height: number;
+}
+
+interface Layout {
+  WIDTH: number;
+  CHART_HEIGHT: number;
+  PLOT_TOP: number;
+  PLOT_BOTTOM: number;
+  PLOT_HEIGHT: number;
+  DAY_LABEL_Y: number;
+  TIME_AXIS_Y: number;
+  LABEL_BOTTOM: number;
+  MOON_Y: number;
+}
+
+function computeLayout(dims: ChartDims): Layout {
+  // Sane minimums so a too-small container doesn't produce inverted math
+  const w = Math.max(200, dims.width);
+  const h = Math.max(120, dims.height);
+  const PLOT_TOP = 28;
+  const PLOT_BOTTOM = h - 33;
+  const TIME_AXIS_Y = h - 10;
+  return {
+    WIDTH: w,
+    CHART_HEIGHT: h,
+    PLOT_TOP,
+    PLOT_BOTTOM,
+    PLOT_HEIGHT: PLOT_BOTTOM - PLOT_TOP,
+    DAY_LABEL_Y: 14,
+    TIME_AXIS_Y,
+    LABEL_BOTTOM: TIME_AXIS_Y - 10,
+    MOON_Y: 8,
+  };
+}
 
 export interface NightInterval {
   start: number;
@@ -22,6 +50,7 @@ function computeGridStep(range: ChartRange): number {
 }
 
 export function renderTideCurve(
+  dims: ChartDims,
   series: TidePoint[],
   hilos: HiLoPrediction[],
   range: ChartRange,
@@ -34,18 +63,20 @@ export function renderTideCurve(
 ): TemplateResult | typeof nothing {
   if (series.length < 2) return nothing;
 
+  const L = computeLayout(dims);
+
   const timeToX = (t: number): number =>
-    ((t - chartStartTime) / (chartEndTime - chartStartTime)) * WIDTH;
+    ((t - chartStartTime) / (chartEndTime - chartStartTime)) * L.WIDTH;
 
   const heightToY = (h: number): number =>
-    PLOT_TOP + PLOT_HEIGHT - ((h - range.min) / (range.max - range.min)) * PLOT_HEIGHT;
+    L.PLOT_TOP + L.PLOT_HEIGHT - ((h - range.min) / (range.max - range.min)) * L.PLOT_HEIGHT;
 
   const points = series.map((p) => ({
     x: timeToX(p.time.getTime()),
     y: heightToY(p.height),
   }));
   const pathD = monotoneCubicPath(points);
-  const areaD = `${pathD} L ${points[points.length - 1].x},${PLOT_BOTTOM} L ${points[0].x},${PLOT_BOTTOM} Z`;
+  const areaD = `${pathD} L ${points[points.length - 1].x},${L.PLOT_BOTTOM} L ${points[0].x},${L.PLOT_BOTTOM} Z`;
 
   const nowMs = now.getTime();
   const nowInRange = nowMs >= chartStartTime && nowMs <= chartEndTime;
@@ -55,23 +86,23 @@ export function renderTideCurve(
 
   // Data boundary: X position of last data point — clip decorations beyond this
   const lastDataMs = series[series.length - 1].time.getTime();
-  const dataEndX = Math.min(WIDTH, timeToX(lastDataMs));
+  const dataEndX = Math.min(L.WIDTH, timeToX(lastDataMs));
 
   // Compute average curve Y for gradient origin
   const avgCurveY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
 
   // Compute day label positions first so grid labels can check for overlap
-  const dayLabelPositions = computeDayLabelPositions(chartStartTime, chartEndTime, timeToX, dataEndX);
+  const dayLabelPositions = computeDayLabelPositions(chartStartTime, chartEndTime, timeToX, dataEndX, L);
 
   // Compute peak labels first so grid labels can avoid them (future only)
-  const peakLabelRects = computeVisiblePeakLabels(hilos, chartStartTime, chartEndTime, nowMs, timeToX, heightToY);
+  const peakLabelRects = computeVisiblePeakLabels(hilos, chartStartTime, chartEndTime, nowMs, timeToX, heightToY, L);
 
   const gridStep = computeGridStep(range);
 
   return html`
-    <svg viewBox="0 0 ${WIDTH} ${CHART_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 ${L.WIDTH} ${L.CHART_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="tidal-fill" x1="0" y1="${avgCurveY}" x2="0" y2="${PLOT_BOTTOM}" gradientUnits="userSpaceOnUse">
+        <linearGradient id="tidal-fill" x1="0" y1="${avgCurveY}" x2="0" y2="${L.PLOT_BOTTOM}" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stop-color="var(--tidal-curve-fill-start, rgba(79,195,247,1.0))" />
           <stop offset="100%" stop-color="var(--tidal-curve-fill-end, rgba(79,195,247,0.30))" />
         </linearGradient>
@@ -79,15 +110,15 @@ export function renderTideCurve(
           <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="var(--tidal-glow-color, rgba(79,195,247,0.35))" />
         </filter>
         <clipPath id="data-clip">
-          <rect x="0" y="0" width="${dataEndX}" height="${CHART_HEIGHT}" />
+          <rect x="0" y="0" width="${dataEndX}" height="${L.CHART_HEIGHT}" />
         </clipPath>
       </defs>
 
       <g clip-path="url(#data-clip)">
-        ${renderDayLines(chartStartTime, chartEndTime, timeToX)}
-        ${renderNightShading(nightIntervals, timeToX)}
-        ${renderGridLines(range, heightToY, gridStep)}
-        ${renderDayLabelsFromPositions(dayLabelPositions)}
+        ${renderDayLines(chartStartTime, chartEndTime, timeToX, L)}
+        ${renderNightShading(nightIntervals, timeToX, L)}
+        ${renderGridLines(range, heightToY, gridStep, L)}
+        ${renderDayLabelsFromPositions(dayLabelPositions, L)}
 
         <path d="${areaD}" fill="url(#tidal-fill)" />
 
@@ -95,7 +126,7 @@ export function renderTideCurve(
           stroke="var(--tidal-curve-stroke, #4FC3F7)" stroke-width="4"
           filter="url(#glow)" />
 
-        ${renderGridLabels(range, heightToY, peakLabelRects.map((l) => l.rect), gridStep)}
+        ${renderGridLabels(range, heightToY, peakLabelRects.map((l) => l.rect), gridStep, L)}
 
         ${peakLabelRects.map((lbl) => {
           const timeStr = formatShortTime(new Date(lbl.item.hl.t));
@@ -113,10 +144,10 @@ export function renderTideCurve(
           ? renderNowDot(nowX, nowY)
           : nothing}
 
-        ${renderTimeAxis(chartStartTime, chartEndTime, timeToX)}
+        ${renderTimeAxis(chartStartTime, chartEndTime, timeToX, L)}
 
         ${showMoonPhases
-          ? renderMoonPhaseIcons(moonPhases, chartStartTime, chartEndTime, timeToX)
+          ? renderMoonPhaseIcons(moonPhases, chartStartTime, chartEndTime, timeToX, L)
           : nothing}
       </g>
     </svg>
@@ -148,6 +179,7 @@ function computeVisiblePeakLabels(
   nowMs: number,
   timeToX: (t: number) => number,
   heightToY: (h: number) => number,
+  L: Layout,
 ): VisiblePeakLabel[] {
   const durationH = (chartEndTime - chartStartTime) / 3600000;
   const MS_PER_DAY = 24 * 3600000;
@@ -203,7 +235,7 @@ function computeVisiblePeakLabels(
 
     let x = item.origX;
     if (x < LEFT_MIN_X) x = LEFT_MIN_X;
-    if (x + halfW > WIDTH - RIGHT_MARGIN) continue;
+    if (x + halfW > L.WIDTH - RIGHT_MARGIN) continue;
     if (x - halfW < 0) continue;
 
     const peakY = heightToY(item.h);
@@ -224,10 +256,10 @@ function computeVisiblePeakLabels(
     }
 
     // Clamp labels to valid zones
-    if (timeY - TIME_ASCENT < PLOT_TOP) timeY = PLOT_TOP + 2;
-    if (timeY + 2 > LABEL_BOTTOM) timeY = LABEL_BOTTOM - 2;
-    if (labelY - HEIGHT_ASCENT < PLOT_TOP) labelY = PLOT_TOP + 2;
-    if (labelY + 2 > LABEL_BOTTOM) labelY = LABEL_BOTTOM - 2;
+    if (timeY - TIME_ASCENT < L.PLOT_TOP) timeY = L.PLOT_TOP + 2;
+    if (timeY + 2 > L.LABEL_BOTTOM) timeY = L.LABEL_BOTTOM - 2;
+    if (labelY - HEIGHT_ASCENT < L.PLOT_TOP) labelY = L.PLOT_TOP + 2;
+    if (labelY + 2 > L.LABEL_BOTTOM) labelY = L.LABEL_BOTTOM - 2;
 
     // Rect: union of both text bounding boxes
     const topY = Math.min(labelY - HEIGHT_ASCENT, timeY - TIME_ASCENT);
@@ -264,6 +296,7 @@ function renderTimeAxis(
   chartStartTime: number,
   chartEndTime: number,
   timeToX: (t: number) => number,
+  L: Layout,
 ) {
   const result = [];
   const durationH = (chartEndTime - chartStartTime) / 3600000;
@@ -281,14 +314,14 @@ function renderTimeAxis(
 
   for (let t = start.getTime(); t < chartEndTime; t += step) {
     const x = timeToX(t);
-    if (x < 20 || x > WIDTH - 10) continue;
+    if (x < 20 || x > L.WIDTH - 10) continue;
     const d = new Date(t);
     const hr = d.getHours();
     const ampm = hr >= 12 ? 'PM' : 'AM';
     const h12 = hr % 12 || 12;
     const label = `${h12} ${ampm}`;
     result.push(svg`
-      <text x="${x}" y="${TIME_AXIS_Y}" text-anchor="middle"
+      <text x="${x}" y="${L.TIME_AXIS_Y}" text-anchor="middle"
         font-size="13" font-weight="400"
         fill="var(--secondary-text-color, #999)">${label}</text>
     `);
@@ -300,6 +333,7 @@ function renderGridLines(
   range: ChartRange,
   heightToY: (h: number) => number,
   step: number,
+  L: Layout,
 ) {
   const first = Math.floor(range.min / step) * step;
   const last = Math.ceil(range.max / step) * step;
@@ -307,9 +341,9 @@ function renderGridLines(
 
   for (let ft = first; ft <= last; ft += step) {
     const y = heightToY(ft);
-    if (y < PLOT_TOP - 2 || y > PLOT_BOTTOM + 2) continue;
+    if (y < L.PLOT_TOP - 2 || y > L.PLOT_BOTTOM + 2) continue;
     result.push(svg`
-      <line x1="0" y1="${y}" x2="${WIDTH}" y2="${y}"
+      <line x1="0" y1="${y}" x2="${L.WIDTH}" y2="${y}"
         stroke="var(--divider-color, rgba(128,128,128,0.2))"
         stroke-width="0.5" opacity="0.12" />
     `);
@@ -322,6 +356,7 @@ function renderGridLabels(
   heightToY: (h: number) => number,
   peakRects: LabelRect[],
   step: number,
+  L: Layout,
 ) {
   const first = Math.floor(range.min / step) * step;
   const last = Math.ceil(range.max / step) * step;
@@ -333,10 +368,10 @@ function renderGridLabels(
 
   for (let ft = first; ft <= last; ft += step) {
     const y = heightToY(ft);
-    if (y < PLOT_TOP - 2 || y > PLOT_BOTTOM + 2) continue;
+    if (y < L.PLOT_TOP - 2 || y > L.PLOT_BOTTOM + 2) continue;
 
     // Hide if grid label Y is within 15px of the day label row
-    if (Math.abs(y - DAY_LABEL_Y) < 15) continue;
+    if (Math.abs(y - L.DAY_LABEL_Y) < 15) continue;
 
     const gTop = y - GRID_LABEL_H / 2;
     const gBottom = y + GRID_LABEL_H / 2;
@@ -366,6 +401,7 @@ function renderDayLines(
   chartStartTime: number,
   chartEndTime: number,
   timeToX: (t: number) => number,
+  L: Layout,
 ) {
   const result = [];
   const MS_PER_DAY = 24 * 3600000;
@@ -375,9 +411,9 @@ function renderDayLines(
 
   for (let midMs = startMidnightMs; midMs < chartEndTime; midMs += MS_PER_DAY) {
     const midX = timeToX(midMs);
-    if (midMs > chartStartTime && midX >= 10 && midX <= WIDTH) {
+    if (midMs > chartStartTime && midX >= 10 && midX <= L.WIDTH) {
       result.push(svg`
-        <line x1="${midX}" y1="0" x2="${midX}" y2="${PLOT_BOTTOM}"
+        <line x1="${midX}" y1="0" x2="${midX}" y2="${L.PLOT_BOTTOM}"
           stroke="var(--primary-text-color, #212121)" stroke-width="2" opacity="0.3" />
       `);
     }
@@ -395,6 +431,7 @@ function computeDayLabelPositions(
   chartEndTime: number,
   timeToX: (t: number) => number,
   dataEndX: number,
+  L: Layout,
 ): DayLabelPos[] {
   const MS_PER_DAY = 24 * 3600000;
   const LABEL_OFFSET_MS = 2 * 3600000;
@@ -409,7 +446,7 @@ function computeDayLabelPositions(
   for (let midMs = startMidnightMs; midMs < chartEndTime; midMs += MS_PER_DAY) {
     const naturalLabelX = timeToX(midMs + LABEL_OFFSET_MS);
     const labelX = Math.max(4, naturalLabelX);
-    if (labelX <= dataEndX - 10 && labelX <= WIDTH - 20) {
+    if (labelX <= dataEndX - 10 && labelX <= L.WIDTH - 20) {
       const dayOfWeek = new Date(midMs).getDay();
       candidates.push({ x: labelX, label: dayNames[dayOfWeek] });
     }
@@ -425,9 +462,9 @@ function computeDayLabelPositions(
   return visible;
 }
 
-function renderDayLabelsFromPositions(positions: DayLabelPos[]) {
+function renderDayLabelsFromPositions(positions: DayLabelPos[], L: Layout) {
   return positions.map((pos) => svg`
-    <text x="${pos.x}" y="${DAY_LABEL_Y}" text-anchor="start"
+    <text x="${pos.x}" y="${L.DAY_LABEL_Y}" text-anchor="start"
       font-size="11" font-weight="600"
       fill="var(--secondary-text-color, #999)">${pos.label}</text>
   `);
@@ -436,16 +473,17 @@ function renderDayLabelsFromPositions(positions: DayLabelPos[]) {
 function renderNightShading(
   nightIntervals: NightInterval[],
   timeToX: (t: number) => number,
+  L: Layout,
 ) {
   if (nightIntervals.length === 0) return nothing;
   return nightIntervals.map((interval) => {
     const x1 = timeToX(interval.start);
     const x2 = timeToX(interval.end);
     const clampX1 = Math.max(0, x1);
-    const clampX2 = Math.min(WIDTH, x2);
+    const clampX2 = Math.min(L.WIDTH, x2);
     if (clampX2 <= clampX1) return nothing;
     return svg`
-      <rect x="${clampX1}" y="0" width="${clampX2 - clampX1}" height="${PLOT_BOTTOM}"
+      <rect x="${clampX1}" y="0" width="${clampX2 - clampX1}" height="${L.PLOT_BOTTOM}"
         fill="var(--tidal-night-fill, rgba(0,0,40,0.08))" />
     `;
   });
@@ -456,6 +494,7 @@ function renderMoonPhaseIcons(
   chartStartTime: number,
   chartEndTime: number,
   timeToX: (t: number) => number,
+  L: Layout,
 ) {
   // Compute day label X positions to avoid collision
   const MS_PER_DAY = 24 * 3600000;
@@ -466,10 +505,9 @@ function renderMoonPhaseIcons(
   const dayLabelXs: number[] = [];
   for (let midMs = startMidnightMs; midMs < chartEndTime; midMs += MS_PER_DAY) {
     const labelX = timeToX(midMs + LABEL_OFFSET_MS);
-    if (labelX >= 0 && labelX <= WIDTH) dayLabelXs.push(labelX);
+    if (labelX >= 0 && labelX <= L.WIDTH) dayLabelXs.push(labelX);
   }
 
-  const MOON_Y = 8; // above day labels (which are at PLOT_TOP - 6 = 22)
   return moonPhases.map((mp) => {
     // Position at noon of the phase day for better separation from day labels
     const phaseNoon = new Date(mp.date);
@@ -478,12 +516,12 @@ function renderMoonPhaseIcons(
     if (t < chartStartTime || t > chartEndTime) return nothing;
     const x = timeToX(t);
     // Hide if clipped at right edge or too close to a day label
-    if (x > WIDTH - 25 || x < 10) return nothing;
+    if (x > L.WIDTH - 25 || x < 10) return nothing;
     const tooClose = dayLabelXs.some((dx) => Math.abs(x - dx) < 25);
     if (tooClose) return nothing;
     const r = 5;
     return svg`
-      <g transform="translate(${x}, ${MOON_Y})">
+      <g transform="translate(${x}, ${L.MOON_Y})">
         ${moonSvgIcon(mp.phase, r)}
         <text x="0" y="14" text-anchor="middle"
           font-size="9" font-weight="400"

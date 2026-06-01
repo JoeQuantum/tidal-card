@@ -27,9 +27,12 @@ class TidalCard extends LitElement {
   @state() private _sunTimes: SunTimes | null = null;
   @state() private _darkMode = true;
   @state() private _entityError: string | null = null;
+  @state() private _chartW = 500;
+  @state() private _chartH = 195;
 
   private _hassObj?: HomeAssistant;
   private _updateTimer?: number;
+  private _resizeObserver?: ResizeObserver;
 
   // --- HA lifecycle ---
 
@@ -121,12 +124,42 @@ class TidalCard extends LitElement {
     }, 60000);
   }
 
+  protected firstUpdated(): void {
+    const container = this.renderRoot.querySelector<HTMLElement>('.chart-container');
+    if (!container) return;
+
+    // Synchronous initial measurement so the first paint uses real dims
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      this._chartW = Math.round(rect.width);
+      this._chartH = Math.round(rect.height);
+    }
+
+    if ('ResizeObserver' in window) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const cr = entry.contentRect;
+          const w = Math.round(cr.width);
+          const h = Math.round(cr.height);
+          // Drop subpixel jitter to avoid render thrash
+          if (w > 0 && h > 0 && (Math.abs(w - this._chartW) > 1 || Math.abs(h - this._chartH) > 1)) {
+            this._chartW = w;
+            this._chartH = h;
+          }
+        }
+      });
+      this._resizeObserver.observe(container);
+    }
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._updateTimer) {
       clearInterval(this._updateTimer);
       this._updateTimer = undefined;
     }
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = undefined;
   }
 
   // --- Data extraction ---
@@ -332,6 +365,7 @@ class TidalCard extends LitElement {
 
         <div class="chart-container">
           ${renderTideCurve(
+            { width: this._chartW, height: this._chartH },
             this._seriesPoints.filter(
               (p) => p.time.getTime() >= chartStartMs - 2 * 3600000 && p.time.getTime() <= chartEndMs,
             ),
