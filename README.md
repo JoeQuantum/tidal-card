@@ -84,19 +84,27 @@ Find your station ID at the [NOAA Tides and Currents map](https://tidesandcurren
 sensor:
   - platform: rest
     name: Tide Predictions Series
-    resource: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&date=today&range=96&interval=30&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
+    resource_template: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&begin_date={{ now().strftime('%Y%m%d') }}&range=96&interval=30&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
     method: GET
     scan_interval: 3600
-    value_template: "OK"
+    value_template: "{% if value_json.predictions is defined %}
+      OK
+      {% else %}
+      ERROR! - {{value_json.error.message}}
+      {% endif %}"
     json_attributes:
       - predictions
 
   - platform: rest
     name: Tide Predictions Hilo
-    resource: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&date=today&range=96&interval=hilo&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
+    resource_template: https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&station=9447130&begin_date={{ now().strftime('%Y%m%d') }}&range=96&interval=hilo&time_zone=lst_ldt&units=english&datum=MLLW&format=json&application=tidal-card
     method: GET
     scan_interval: 3600
-    value_template: "OK"
+    value_template: "{% if value_json.predictions is defined %}
+      OK
+      {% else %}
+      ERROR! - {{value_json.error.message}}
+      {% endif %}"
     json_attributes:
       - predictions
 ```
